@@ -1,0 +1,69 @@
+footer {
+  display: flex;
+  justify-content: space-between; /* texto a la izq y botón a la der */
+  align-items: center;
+  padding: 1rem 2rem;
+  background: #f8f8f8;
+  border-top: 1px solid #ddd;
+}
+
+.menu-btn {
+  background: #1900ff;
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.menu-btn:hover {
+  background: #0f0099;
+}
+
+/* 🔹 Menú lateral */
+.menu-lateral {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 260px;
+  height: 100%;
+  background: white;
+  border-right: 2px solid #ddd;
+  box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  padding: 2rem 1.5rem;
+  z-index: 1000;
+}
+
+.menu-lateral h3 {
+  margin-bottom: 1rem;
+  color: #1900ff;
+}
+
+.menu-lateral ul {
+  list-style: none;
+  padding: 0;
+}
+
+.menu-lateral ul li {
+  margin-bottom: 1rem;
+}
+
+.menu-lateral ul li a {
+  text-decoration: none;
+  font-size: 1.1rem;
+  color: #333;
+  transition: color 0.2s;
+}
+
+.menu-lateral ul li a:hover {
+  color: #1900ff;
+}
+
+/* Estado activo (visible) */
+.menu-lateral.activo {
+  transform: translateX(0);
+}

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Practical-Hands</title>
+  <link rel="icon" type="image/png" href="../database/img/Logo.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styleTraslate.css">
+  <link rel="stylesheet" href="css/styleMenuLateral.css">
+</head>
+<body>
+
+  <!-- 🔹 Navbar -->
+  <header>
+    <nav class="navbar">
+      <div class="logo">Practical<span>Hands</span></div>
+      <ul class="nav-links">
+        <li><a href="#inicio" class="active">Inicio</a></li>
+        <li><a href="#nosotros">Nosotros</a></li>
+        <li><a href="#herramientas">Herramientas</a></li>
+        <li><a href="#contacto">Contáctenos</a></li>
+      </ul>
+      
+      <a href="#traductor" class="btn-traductor">Traductor SAM-2HL</a>
+
+    </nav>
+  </header>
+
+  <!-- 🔹 Contenedor dinámico -->
+  <main id="contenido">
+    <section id="inicio" class="section inicio-container">
+      <div class="inicio-texto">
+        <h1>Herramienta Tecnológica para ayuda humanitaria y consentimiento social</h1>
+        <p>
+          El objetivo de esta página es netamente educativo y contribuir a la construcción
+          de un mundo mejor. Nos esforzamos juntos como sociedad para convertirnos en un entorno
+          dedicado al desarrollo de herramientas para la ayuda de otros.
+        </p>
+      </div>
+      <div class="inicio-imagen">
+        <img src="../database/img/Logo.png" alt="Logo Practical Hands">
+      </div>
+    </section>
+  </main>
+
+  <!-- 🔹 Footer -->
+  <footer>
+    <p>© 2025 Practical-Hands. Todos los derechos reservados.</p>
+
+      <!-- 🔹 Botón opciones -->
+       <button class="menu-btn" id="menu-btn">
+         Opciones
+       </button>
+
+  </footer>
+
+
+  <!-- 🔹 Sección Traductor oculto-->
+   <section id="traductor" class="section traductor-container oculto">
+
+    <h2>Traductor <span>2HL</span> Lengua de señas </h2>
+
+    
+    <div class="traductor-grid">
+
+      <!-- 🔹 Columna Única -->
+       <div class="traductor-form">
+        <textarea placeholder="Ingrese frase a traducir..."></textarea>
+
+        <div class="instructions">
+          <p>Palabras de contexto separadas por (,)</p>
+        </div>
+
+        <select>
+          <option>Colombia</option>
+          <option>México</option>
+          <option>Argentina</option>
+          <option>Chile</option>
+        </select>
+
+        <div class="botones">
+          <button class="btn traducirBtn">Traducir</button>
+          <button class="btn limpiarBtn">Limpiar</button>
+          <button class="btn seniasPalabrasBtn">Señas a palabras</button>
+        </div>
+      </div>
+
+        <!-- 🔹 Columna de pantalla donde saldrá la seña -->
+        <div class="traductor-output">
+          <div class="pantalla"></div>
+        </div>
+
+
+
+    </div>
+
+   </section>
+   
+   
+   <!-- 🔹 Menú lateral oculto -->
+    <aside id="menu-lateral" class="menu-lateral">
+      <h3>Opciones Guías</h3>
+      <ul>
+        <li><a href="https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf" target="_blank">Guía Colombia</a></li>
+        <li><a href="https://educacionespecial.sep.gob.mx/storage/recursos/2023/05/xzrfl019nV-4Diccionario_lengua_%20Senas.pdf" target="_blank">Guía México</a></li>
+        <li><a href="https://www.slideshare.net/slideshow/diccionariolengua-de-seasargentina/36641874" target="_blank">Guía Argentina</a></li>
+        <li><a href="https://especial.mineduc.cl/wp-content/uploads/sites/31/2018/07/Diccionario_LSCh_A-H.pdf" target="_blank">Guía Chile</a></li>
+      </ul>
+    </aside>
+
+
+  <script src="scripts/app.js"></script>
+  <script src="scripts/designPage.js"></script>
+  <script src="scripts/menu.js"></script>
+
+</body>
+</html>
