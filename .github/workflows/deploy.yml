@@ -1,0 +1,47 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'database/**'
+      - '.github/workflows/deploy.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # (Opcional) Validación mínima: que exista index.html en frontend
+      - name: Ensure index.html exists
+        run: |
+          test -f frontend/index.html || (echo "frontend/index.html not found" && exit 1)
+
+      # Copiamos TODO lo que necesita el sitio estático a /public
+      # Esto mantiene las rutas relativas que ya usas (../database/img/Logo.png, css/, scripts/, etc.)
+      - name: Prepare static site
+        run: |
+          rm -rf public
+          mkdir -p public
+          # copia frontend completo
+          cp -r frontend/* public/
+          # copia la carpeta database (imgs) al mismo nivel que frontend
+          cp -r database public/database
+          # 404.html para SPA / refresh en rutas (opcional pero recomendado)
+          if [ ! -f public/404.html ]; then cp public/index.html public/404.html; fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
