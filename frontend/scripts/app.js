@@ -236,46 +236,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-function procesarFrame(video, canvas, textoSalida) {
-  if (!ctx || !currentStream) return;
+  function procesarFrame(video, canvas, textoSalida) {
+    if (!ctx || !currentStream) return;
 
-  const vw = video.videoWidth || 640;
-  const vh = video.videoHeight || 360;
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+    const frameBase64 = tempCanvas.toDataURL("image/jpeg");
 
-  // dibuja el frame del video a un canvas temporal
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = vw;
-  tempCanvas.height = vh;
-  const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.drawImage(video, 0, 0, vw, vh);
-  const frameBase64 = tempCanvas.toDataURL("image/jpeg");
-
-  fetch(`${API_BASE}/detectar-senas`, {
-    method: "POST",
-    mode: "cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ frame: frameBase64 })
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.frame) {
-        const img = new Image();
-        img.onload = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        };
-        img.src = data.frame;
-      }
-      if (data.letra) textoSalida.textContent = `Seña detectada: ${data.letra}`;
-
-      // vuelve a pedir el siguiente frame (si la cámara sigue activa)
-      if (currentStream) requestAnimationFrame(() => procesarFrame(video, canvas, textoSalida));
+    fetch(`${API_BASE}/detectar-senas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frame: frameBase64 })
     })
-    .catch(err => {
-      console.error(err);
-      if (currentStream) requestAnimationFrame(() => procesarFrame(video, canvas, textoSalida));
-    });
-}
+      .then(res => res.json())
+      .then(data => {
+        if (data.frame) {
+          const img = new Image();
+          img.src = data.frame;
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          };
+        }
+        if (data.letra) textoSalida.textContent = `Seña detectada: ${data.letra}`;
+        requestAnimationFrame(() => procesarFrame(video, canvas, textoSalida));
+      })
+      .catch(err => console.error(err));
+  }
 
   function detenerCamara(video, boton, textoSalida) {
     if (currentStream) currentStream.getTracks().forEach(track => track.stop());
