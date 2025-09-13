@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import json, os, base64
+import json, os, base64, time
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -8,21 +8,18 @@ from collections import deque, Counter
 
 app = Flask(__name__)
 
-# ---- CORS (GitHub Pages + proyecto) ----
+# ---- CORS ----
 ALLOWED_ORIGINS = [
     "https://samuelarangoizad.github.io",
     "https://samuelarangoizad.github.io/Hands-Help",
-    # opcionales para pruebas locales:
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
+    "http://localhost:5500", "http://127.0.0.1:5500",
 ]
-
 CORS(
     app,
     resources={r"/*": {"origins": ALLOWED_ORIGINS}},
     supports_credentials=False,
     methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"]
+    allow_headers=["Content-Type"],
 )
 
 @app.after_request
@@ -35,10 +32,7 @@ def add_cors_headers(resp):
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return resp
 
-
-# ============================
-# 1) Cargar Diccionario (texto -> señas - imágenes)
-# ============================
+# ============ Diccionario ============
 with open(os.path.join("senias", "Diccionario.json"), "r", encoding="utf-8") as f:
     diccionario_senas = json.load(f)
 
@@ -46,35 +40,25 @@ with open(os.path.join("senias", "Diccionario.json"), "r", encoding="utf-8") as 
 def home():
     return {"message": "Backend funcionando"}
 
-
-# ============================
-# 2) Texto -> señas (imágenes)
-# ============================
+# ============ Texto -> Señas ============
 @app.route("/traducir", methods=["POST", "OPTIONS"])
 def traducir():
-    # Responder rápido el preflight
     if request.method == "OPTIONS":
         return ("", 200)
-
     data = request.json or {}
     texto = (data.get("texto") or "").lower()
-
-    senas = []
-    for letra in texto:
-        if letra in diccionario_senas:
-            senas.append({"letra": letra, "url": diccionario_senas[letra]})
+    senas = [{"letra": ch, "url": diccionario_senas[ch]} for ch in texto if ch in diccionario_senas]
     return jsonify({"original": texto, "senas": senas})
 
-
-# ============================
-# 3) Señas -> LETRA (MediaPipe Hands)
-# ============================
+# ============ Señales / MediaPipe ============
 mp_hands = mp.solutions.hands
+# ⚡ más rápido y robusto en servidor
 hands = mp_hands.Hands(
     static_image_mode=False,
-    max_num_hands=1,               # 1 mano para alfabeto
-    min_detection_confidence=0.65, # más sensible
-    min_tracking_confidence=0.65
+    max_num_hands=1,
+    model_complexity=0,            # 0 = más rápido
+    min_detection_confidence=0.5,  # umbral razonable
+    min_tracking_confidence=0.5,
 )
 mp_draw = mp.solutions.drawing_utils
 
@@ -83,7 +67,6 @@ TIP =   {"thumb":4, "index":8, "middle":12, "ring":16, "pinky":20}
 PIP =   {"thumb":3, "index":6, "middle":10, "ring":14, "pinky":18}
 MCP =   {"thumb":2, "index":5, "middle":9, "ring":13, "pinky":17}
 
-# ---------- utilidades geométricas ----------
 def np_point(lm): return np.array([lm.x, lm.y], dtype=np.float32)
 
 def palm_size(lms):
@@ -92,13 +75,13 @@ def palm_size(lms):
 
 def norm_landmarks(lms):
     w = np_point(lms[WRIST]); s = palm_size(lms)
-    return np.vstack([(np_point(lm) - w) / s for lm in lms])  # (21,2)
+    return np.vstack([(np_point(lm) - w) / s for lm in lms])
 
 def dist(a,b): return float(np.linalg.norm(a - b))
 
 def is_finger_extended(pts, finger):
     w, tip, pip = pts[WRIST], pts[TIP[finger]], pts[PIP[finger]]
-    return dist(tip, w) > dist(pip, w) + 0.05  # antes 0.07
+    return dist(tip, w) > dist(pip, w) + 0.05
 
 def finger_curl(pts, finger):
     tip_mcp = dist(pts[TIP[finger]], pts[MCP[finger]])
@@ -106,11 +89,7 @@ def finger_curl(pts, finger):
     return pip_mcp - tip_mcp
 
 def thumb_index_tip_distance(pts):  return dist(pts[TIP["thumb"]],  pts[TIP["index"]])
-def index_middle_tip_distance(pts): return dist(pts[TIP["index"]], pts[TIP["middle"]])
-def ring_pinky_tip_distance(pts):   return dist(pts[TIP["ring"]],   pts[TIP["pinky"]])
-
 def finger_dir(pts, finger): return pts[TIP[finger]] - pts[MCP[finger]]
-
 def angle(u, v):
     u = u / (np.linalg.norm(u) + 1e-8)
     v = v / (np.linalg.norm(v) + 1e-8)
@@ -121,8 +100,6 @@ def group_distance(pts, tips=("index","middle","ring","pinky")):
     c = arr.mean(axis=0)
     return float(np.mean(np.linalg.norm(arr - c, axis=1)))
 
-
-# ---------- clasificador heurístico (con 'C' mejorada) ----------
 def classify_letter(pts):
     ext = {f: is_finger_extended(pts, f) for f in TIP.keys()}
     d_ti = thumb_index_tip_distance(pts)
@@ -139,20 +116,15 @@ def classify_letter(pts):
     spread = group_distance(pts)
 
     if (ext["thumb"] and ext["index"] and ext["middle"] and ext["ring"] and ext["pinky"]
-        and curl_mean > 0.02
-        and 0.10 <= d_ti <= 0.45
-        and 1.05 <= ang_idx_thumb <= 2.45
-        and spread >= 0.05):
+        and curl_mean > 0.02 and 0.10 <= d_ti <= 0.45
+        and 1.05 <= ang_idx_thumb <= 2.45 and spread >= 0.05):
         return "C"
-
     if (not ext["index"] and not ext["middle"] and not ext["ring"] and not ext["pinky"]
         and curl_mean > 0.04 and d_ti < 0.14):
         return "E"
-
     if (ext["index"] and not ext["middle"] and not ext["ring"] and not ext["pinky"]
         and ext["thumb"] and ang_idx_x < 0.45 and angle(dir_idx, dir_thumb) < 0.6):
         return "G"
-
     if (ext["index"] and ext["middle"] and not ext["ring"] and not ext["pinky"] and not ext["thumb"]
         and ang_idx_mid < 0.35 and max(ang_idx_x, ang_mid_x) < 0.5):
         return "H"
@@ -168,8 +140,6 @@ def classify_letter(pts):
     if not any([ext["index"], ext["middle"], ext["ring"], ext["pinky"]]): return "A"
     return "?"
 
-
-# ---------- suavizado temporal ----------
 last_preds = deque(maxlen=7)
 
 @app.route("/detectar-senas", methods=["POST", "OPTIONS"])
@@ -177,11 +147,13 @@ def detectar_senas():
     if request.method == "OPTIONS":
         return ("", 200)
 
+    t0 = time.time()
     data = request.json or {}
     frame_data = data.get("frame")
     if not frame_data:
         return jsonify({"error": "No frame recibido"}), 400
 
+    # ---- Decodificar y reescalar a 640 px (ancho) para acelerar
     try:
         _, b64 = frame_data.split(",", 1)
     except ValueError:
@@ -190,15 +162,22 @@ def detectar_senas():
     if frame is None:
         return jsonify({"error": "Frame inválido"}), 400
 
+    h, w = frame.shape[:2]
+    if w > 640:
+        nh = int(h * 640 / w)
+        frame = cv2.resize(frame, (640, nh), interpolation=cv2.INTER_AREA)
+
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     res = hands.process(rgb)
 
     letra = "?"
+    n_hands = 0
     if res.multi_hand_landmarks:
+        n_hands = len(res.multi_hand_landmarks)
         hand_landmarks = res.multi_hand_landmarks[0]
         mp_draw.draw_landmarks(
             frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
-            mp_draw.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=3),
+            mp_draw.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=2),
             mp_draw.DrawingSpec(color=(255,0,0), thickness=2)
         )
         pts = norm_landmarks(hand_landmarks.landmark)
@@ -208,14 +187,21 @@ def detectar_senas():
         last_preds.append(letra)
     letra_estable = Counter(last_preds).most_common(1)[0][0] if last_preds else "?"
 
-    cv2.rectangle(frame, (8, 8), (140, 48), (0, 0, 0), thickness=-1)
-    cv2.putText(frame, f"Letra: {letra_estable}", (16, 38),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2, cv2.LINE_AA)
+    # Overlay debug
+    cv2.rectangle(frame, (8, 8), (220, 64), (0, 0, 0), thickness=-1)
+    cv2.putText(frame, f"Letra: {letra_estable}", (16, 56),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255,255,255), 2, cv2.LINE_AA)
 
     _, buf = cv2.imencode(".jpg", frame)
     img64 = base64.b64encode(buf).decode("utf-8")
-    return jsonify({"frame": f"data:image/jpeg;base64,{img64}", "letra": letra_estable})
 
+    elapsed = round((time.time() - t0) * 1000)
+    # devolvemos info de debug para verlo en consola del navegador
+    return jsonify({
+        "frame": f"data:image/jpeg;base64,{img64}",
+        "letra": letra_estable,
+        "debug": {"hands": n_hands, "ms": elapsed}
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

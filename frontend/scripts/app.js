@@ -242,7 +242,7 @@ function procesarFrame(video, canvas, textoSalida) {
   const vw = video.videoWidth || 640;
   const vh = video.videoHeight || 360;
 
-  // dibuja el frame del video a un canvas temporal
+  // Canvas temporal a resolución del video (el backend reescala de nuevo a 640)
   const tempCanvas = document.createElement("canvas");
   tempCanvas.width = vw;
   tempCanvas.height = vh;
@@ -250,6 +250,7 @@ function procesarFrame(video, canvas, textoSalida) {
   tempCtx.drawImage(video, 0, 0, vw, vh);
   const frameBase64 = tempCanvas.toDataURL("image/jpeg");
 
+  const t0 = performance.now();
   fetch(`${API_BASE}/detectar-senas`, {
     method: "POST",
     mode: "cors",
@@ -258,6 +259,11 @@ function procesarFrame(video, canvas, textoSalida) {
   })
     .then(res => res.json())
     .then(data => {
+      const t1 = performance.now();
+      if (data.debug) {
+        console.log(`hands=${data.debug.hands} | ${data.debug.ms}ms server | ${Math.round(t1 - t0)}ms RTT`);
+      }
+
       if (data.frame) {
         const img = new Image();
         img.onload = () => {
@@ -268,14 +274,15 @@ function procesarFrame(video, canvas, textoSalida) {
       }
       if (data.letra) textoSalida.textContent = `Seña detectada: ${data.letra}`;
 
-      // vuelve a pedir el siguiente frame (si la cámara sigue activa)
-      if (currentStream) requestAnimationFrame(() => procesarFrame(video, canvas, textoSalida));
+      // ~10 fps para no saturar el servidor gratis
+      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 100);
     })
     .catch(err => {
-      console.error(err);
-      if (currentStream) requestAnimationFrame(() => procesarFrame(video, canvas, textoSalida));
+      console.error("detectar-senas error:", err);
+      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 200);
     });
 }
+
 
   function detenerCamara(video, boton, textoSalida) {
     if (currentStream) currentStream.getTracks().forEach(track => track.stop());
