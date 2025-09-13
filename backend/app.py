@@ -12,9 +12,9 @@ app = Flask(__name__)
 # Configuración
 # ============================
 # Si pones False, el backend NO devolverá la imagen anotada (menos carga).
-RETURN_FRAME = True
+RETURN_FRAME = False
 # Máximo ancho del frame procesado en el servidor (reduce CPU/RAM)
-SERVER_MAX_W = 480
+SERVER_MAX_W = 400
 
 # ---- CORS: autoriza tu GitHub Pages y (opcional) localhost ----
 ALLOWED_ORIGINS = [
