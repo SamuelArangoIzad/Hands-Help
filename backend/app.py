@@ -7,7 +7,7 @@ import numpy as np
 from collections import deque, Counter
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": ["https://samuelarangoi zad.github.io"]}})
 
 # ============================
 # 1) Cargar Diccionario (texto -> señas - imágenes)
