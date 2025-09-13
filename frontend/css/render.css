@@ -1,0 +1,39 @@
+/* ========== Soporte visual de “pantalla” y video/canvas ========== */
+
+/* Pantalla general (panel derecho del traductor de texto → señas) */
+.traductor-output .pantalla {
+  display: block;
+  min-height: 340px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  position: relative;
+  overflow: hidden;
+}
+
+/* En modo “señas a palabras” usamos layout con video-container RELATIVO,
+   no absoluto, para que respete el flujo y el alto limitado */
+.video-container{
+  position: relative;        /* importante para overlay */
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: clamp(220px, 42vw, 360px);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Video y canvas alineados y escalados */
+.video-container video,
+.video-container canvas{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+}
+
+/* Overlay explícito */
+#canvasOverlay { display: block; }
+
+/* Detalle visual del video cuando se usa fuera del panel derecho */
+#videoCamara { border-bottom: 2px solid #3f37ff; }

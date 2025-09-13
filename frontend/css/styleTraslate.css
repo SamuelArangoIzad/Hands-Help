@@ -1,147 +1,191 @@
-/* Palabras a señas*/
+/* ========== Traductor (Texto ↔ Señas) ========== */
 
-/* Ocultar por defecto */
-.oculto {
-  display: none;
-}
+/* Utilidades */
+.oculto { display: none; }
 
+/* Contenedor general del módulo Traductor */
 .traductor-container {
-  padding: 2rem;
+  padding: 2rem 2rem 3rem;
 }
 
+/* Título */
 .traductor-container h2 {
   font-size: 2rem;
   margin-bottom: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
+.traductor-container h2 span { color: #3f37ff; }
 
-.traductor-container h2 span {
-  color: #1900ff; /* violeta */
-}
-
+/* Grid principal: formulario (izq) + panel resultado (der) */
 .traductor-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.1fr 0.9fr;
   gap: 2rem;
 }
+@media (max-width: 960px) {
+  .traductor-grid { grid-template-columns: 1fr; }
+}
 
+/* Campos del formulario */
 .traductor-form textarea,
 .traductor-form input,
 .traductor-form select {
   width: 100%;
-  padding: 0.8rem;
+  padding: 0.9rem 1rem;
   margin-bottom: 1rem;
-  border: 1px solid #ddd;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  color: #111827;
+}
+.traductor-form textarea::placeholder { color: #9aa3b2; }
+
+/* Caja de instrucciones */
+.instructions {
+  margin: 1.2rem 0;
+  padding: 0.7rem 1rem;
+  background: #f4f6ff;
+  border-left: 4px solid #3f37ff;
   border-radius: 8px;
+  color: #333;
+  font-size: 0.95rem;
 }
 
+/* Botonera “texto → señas” (debajo del formulario) */
 .botones {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
 }
-
-.botones .btn {
-  background: #1900ff;
-  color: white;
-  padding: 0.8rem 1.5rem;
+.btn {
   border: none;
-  border-radius: 20px;
   cursor: pointer;
+  padding: 0.9rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 700;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
-
-.botones .btn:hover {
-  background: #1900ff;
+.btn-primary {
+  background: #3f37ff;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(63,55,255,0.18);
 }
+.btn-primary:hover { background: #2b2bcc; }
+.btn-ghost {
+  background: #fff;
+  color: #3f37ff;
+  border: 2px solid #3f37ff;
+}
+.btn-ghost:hover { background: #f6f7fb; }
 
-/* Pantalla del intérprete */
+/* Panel de resultado (columna derecha) */
 .traductor-output {
-  border: 1px solid #333;
-  height: 400px;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  align-items: stretch;
 }
-
-.traductor-output .pantalla {
-  width: 95%;
-  height: 95%;
-  border: 1px solid #aaa;
-  background: white;
-}
-
-.instructions {
-  margin: 1.2rem 0;
-  padding: 0.6rem 1rem;
-  background: #f4f4f9;
-  border-left: 4px solid #1900ff;
-  font-size: 0.9rem;
-  color: #333;
-  border-radius: 6px;
-}
-
-
-
-/* Señas a palabras */
-
-#videoCamara {
+.panel-resultado {
   width: 100%;
-  height: 70%;
-  object-fit: cover;
-  border-bottom: 2px solid #1900ff;
-  border-radius: 8px 8px 0 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 0.9rem;
+  margin-bottom: 16px;               /* aire inferior para que nada quede pegado */
+}
+.panel-resultado .panel-body.pantalla {
+  min-height: 340px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
 }
 
-/* 📜 Texto interpretado */
-.texto-salida {
-  height: 30%;
-  background: #f4f4f9;
+/* ====== Modo “Señas a Palabras” ====== */
+/* Cuando conviertes a modo de señas podrías usar 1 sola columna si quieres */
+.traductor-grid.modo-senias { grid-template-columns: 1fr; }
+.col-der.oculto { display: none; }
+
+/* Layout de cámara + panel lateral de controles (DERECHA) */
+.senias-layout{
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 240px; /* video | panel lateral */
+  gap: 16px;
+  align-items: start;
+  margin-top: 8px;
+}
+@media (max-width: 960px){
+  .senias-layout{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Contenedor del video/canvas (limitado para que no empuje la página) */
+.senias-ui .video-container{
+  position: relative;                 /* importante para que el canvas se superponga */
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: clamp(220px, 42vw, 360px);  /* no más de 360px de alto en desktop */
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid #e5e7eb;
+}
+
+/* Video y canvas ocupando todo el contenedor */
+.senias-ui #videoCamara,
+.senias-ui #canvasOverlay{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Texto interpretado debajo del video */
+.senias-ui .texto-salida{
+  min-height: 56px;
+  background: #f4f6ff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  font-weight: bold;
+  font-weight: 700;
   color: #333;
-  padding: 1rem;
-  border-radius: 0 0 8px 8px;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 10px;                   /* separación del video */
 }
 
-
-
-/* Aditional */
-/* Que el grid pase a 1 sola columna en modo señas */
-.traductor-grid.modo-senias { 
-  grid-template-columns: 1fr;
+/* Panel lateral derecho (BOTONES aquí) */
+.controls-panel{
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 96px;                          /* se queda visible al hacer scroll */
+  align-self: start;
+}
+.controls-panel h4{
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: #111827;
+}
+.controls-panel .btn{
+  width: 100%;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.controls-panel .btn + .btn{
+  margin-left: 0;
 }
 
-/* Utilidad para ocultar la columna derecha */
-.col-der.oculto { 
-  display: none;
-}
-
-/* (Opcional) separador cuando se muestra la UI de cámara */
+/* En modo señas, separa un poco la botonera del formulario, por si se muestra */
 .senias-ui .botones { 
   margin-top: 1rem; 
   gap: 0.75rem; 
   flex-wrap: wrap; 
-}
-
-/* Video + texto (ya los tenías, los dejo por claridad) */
-#videoCamara {
-  width: 100%;
-  height: 70%;
-  object-fit: cover;
-  border-bottom: 2px solid #1900ff;
-  border-radius: 8px 8px 0 0;
-}
-
-.texto-salida {
-  height: 30%;
-  background: #f4f4f9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  font-weight: bold;
-  color: #333;
-  padding: 1rem;
-  border-radius: 0 0 8px 8px;
 }

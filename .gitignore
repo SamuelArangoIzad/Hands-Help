@@ -1,0 +1,61 @@
+# ========== Python ==========
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Entornos
+.env
+.env.*
+
+# Distribución / builds
+build/
+dist/
+pip-wheel-metadata/
+
+# Archivos de pruebas
+.coverage
+.tox/
+.nox/
+
+# Logs
+*.log
+
+# ========== Node / Frontend ==========
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+
+# Build / salida
+/.next/
+out/
+.next
+.cache/
+coverage/
+
+# ========== Sistema ==========
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ========== Otros ==========
+# Archivos grandes de librerías
+*.so
+*.dll
+*.dylib
