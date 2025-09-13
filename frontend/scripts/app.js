@@ -239,16 +239,20 @@ document.addEventListener("DOMContentLoaded", () => {
 function procesarFrame(video, canvas, textoSalida) {
   if (!ctx || !currentStream) return;
 
+  // 1) Escala de captura: ~480p para bajar tamaño
   const vw = video.videoWidth || 640;
   const vh = video.videoHeight || 360;
+  const targetW = 480;
+  const targetH = Math.round((vh / vw) * targetW);
 
-  // Canvas temporal a resolución del video (el backend reescala de nuevo a 640)
   const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = vw;
-  tempCanvas.height = vh;
-  const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.drawImage(video, 0, 0, vw, vh);
-  const frameBase64 = tempCanvas.toDataURL("image/jpeg");
+  tempCanvas.width = targetW;
+  tempCanvas.height = targetH;
+  const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+  tempCtx.drawImage(video, 0, 0, targetW, targetH);
+
+  // 2) Comprime bastante el JPEG (0.55)
+  const frameBase64 = tempCanvas.toDataURL("image/jpeg", 0.55);
 
   const t0 = performance.now();
   fetch(`${API_BASE}/detectar-senas`, {
@@ -261,7 +265,9 @@ function procesarFrame(video, canvas, textoSalida) {
     .then(data => {
       const t1 = performance.now();
       if (data.debug) {
-        console.log(`hands=${data.debug.hands} | ${data.debug.ms}ms server | ${Math.round(t1 - t0)}ms RTT`);
+        console.log(
+          `hands=${data.debug.hands} | ${data.debug.ms}ms server | ${Math.round(t1 - t0)}ms RTT`
+        );
       }
 
       if (data.frame) {
@@ -272,14 +278,17 @@ function procesarFrame(video, canvas, textoSalida) {
         };
         img.src = data.frame;
       }
-      if (data.letra) textoSalida.textContent = `Seña detectada: ${data.letra}`;
+      if (data.letra) {
+        textoSalida.textContent = `Seña detectada: ${data.letra}`;
+      }
 
-      // ~10 fps para no saturar el servidor gratis
-      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 100);
+      // 3) Throttle: ~3–4 FPS para no saturar Render free
+      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 280);
     })
     .catch(err => {
       console.error("detectar-senas error:", err);
-      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 200);
+      // Backoff si falló (1 s)
+      if (currentStream) setTimeout(() => procesarFrame(video, canvas, textoSalida), 1000);
     });
 }
 
