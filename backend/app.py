@@ -8,11 +8,20 @@ from collections import deque, Counter
 
 app = Flask(__name__)
 
-# ---- CORS ----
+# ============================
+# Configuración
+# ============================
+# Si pones False, el backend NO devolverá la imagen anotada (menos carga).
+RETURN_FRAME = True
+# Máximo ancho del frame procesado en el servidor (reduce CPU/RAM)
+SERVER_MAX_W = 480
+
+# ---- CORS: autoriza tu GitHub Pages y (opcional) localhost ----
 ALLOWED_ORIGINS = [
     "https://samuelarangoizad.github.io",
     "https://samuelarangoizad.github.io/Hands-Help",
-    "http://localhost:5500", "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
 ]
 CORS(
     app,
@@ -32,7 +41,9 @@ def add_cors_headers(resp):
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return resp
 
-# ============ Diccionario ============
+# ============================
+# Diccionario (texto -> señas)
+# ============================
 with open(os.path.join("senias", "Diccionario.json"), "r", encoding="utf-8") as f:
     diccionario_senas = json.load(f)
 
@@ -40,7 +51,6 @@ with open(os.path.join("senias", "Diccionario.json"), "r", encoding="utf-8") as 
 def home():
     return {"message": "Backend funcionando"}
 
-# ============ Texto -> Señas ============
 @app.route("/traducir", methods=["POST", "OPTIONS"])
 def traducir():
     if request.method == "OPTIONS":
@@ -50,14 +60,15 @@ def traducir():
     senas = [{"letra": ch, "url": diccionario_senas[ch]} for ch in texto if ch in diccionario_senas]
     return jsonify({"original": texto, "senas": senas})
 
-# ============ Señales / MediaPipe ============
+# ============================
+# MediaPipe Hands
+# ============================
 mp_hands = mp.solutions.hands
-# ⚡ más rápido y robusto en servidor
 hands = mp_hands.Hands(
     static_image_mode=False,
     max_num_hands=1,
-    model_complexity=0,            # 0 = más rápido
-    min_detection_confidence=0.5,  # umbral razonable
+    model_complexity=0,            # 0 = más rápido (ideal para servidor free)
+    min_detection_confidence=0.5,
     min_tracking_confidence=0.5,
 )
 mp_draw = mp.solutions.drawing_utils
@@ -90,6 +101,7 @@ def finger_curl(pts, finger):
 
 def thumb_index_tip_distance(pts):  return dist(pts[TIP["thumb"]],  pts[TIP["index"]])
 def finger_dir(pts, finger): return pts[TIP[finger]] - pts[MCP[finger]]
+
 def angle(u, v):
     u = u / (np.linalg.norm(u) + 1e-8)
     v = v / (np.linalg.norm(v) + 1e-8)
@@ -140,6 +152,7 @@ def classify_letter(pts):
     if not any([ext["index"], ext["middle"], ext["ring"], ext["pinky"]]): return "A"
     return "?"
 
+# suavizado temporal
 last_preds = deque(maxlen=7)
 
 @app.route("/detectar-senas", methods=["POST", "OPTIONS"])
@@ -148,61 +161,73 @@ def detectar_senas():
         return ("", 200)
 
     t0 = time.time()
-    data = request.json or {}
-    frame_data = data.get("frame")
-    if not frame_data:
-        return jsonify({"error": "No frame recibido"}), 400
-
-    # ---- Decodificar y reescalar a 640 px (ancho) para acelerar
     try:
-        _, b64 = frame_data.split(",", 1)
-    except ValueError:
-        b64 = frame_data
-    frame = cv2.imdecode(np.frombuffer(base64.b64decode(b64), np.uint8), cv2.IMREAD_COLOR)
-    if frame is None:
-        return jsonify({"error": "Frame inválido"}), 400
+        data = request.json or {}
+        frame_data = data.get("frame")
+        if not frame_data:
+            return jsonify({"error": "No frame recibido"}), 400
 
-    h, w = frame.shape[:2]
-    if w > 640:
-        nh = int(h * 640 / w)
-        frame = cv2.resize(frame, (640, nh), interpolation=cv2.INTER_AREA)
+        # ---- Decodificar base64
+        try:
+            _, b64 = frame_data.split(",", 1)
+        except ValueError:
+            b64 = frame_data
+        frame = cv2.imdecode(np.frombuffer(base64.b64decode(b64), np.uint8),
+                             cv2.IMREAD_COLOR)
+        if frame is None:
+            return jsonify({"error": "Frame inválido"}), 400
 
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    res = hands.process(rgb)
+        # ---- Reescalar en servidor
+        h, w = frame.shape[:2]
+        if w > SERVER_MAX_W:
+            nh = int(h * SERVER_MAX_W / w)
+            frame = cv2.resize(frame, (SERVER_MAX_W, nh), interpolation=cv2.INTER_AREA)
 
-    letra = "?"
-    n_hands = 0
-    if res.multi_hand_landmarks:
-        n_hands = len(res.multi_hand_landmarks)
-        hand_landmarks = res.multi_hand_landmarks[0]
-        mp_draw.draw_landmarks(
-            frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
-            mp_draw.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=2),
-            mp_draw.DrawingSpec(color=(255,0,0), thickness=2)
-        )
-        pts = norm_landmarks(hand_landmarks.landmark)
-        letra = classify_letter(pts)
+        # ---- MediaPipe
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        res = hands.process(rgb)
 
-    if letra != "?":
-        last_preds.append(letra)
-    letra_estable = Counter(last_preds).most_common(1)[0][0] if last_preds else "?"
+        letra = "?"
+        n_hands = 0
+        if res.multi_hand_landmarks:
+            n_hands = len(res.multi_hand_landmarks)
+            hl = res.multi_hand_landmarks[0]
+            pts = norm_landmarks(hl.landmark)
+            letra = classify_letter(pts)
+            # Dibuja solo si vas a devolver imagen
+            if RETURN_FRAME:
+                mp_draw.draw_landmarks(
+                    frame, hl, mp_hands.HAND_CONNECTIONS,
+                    mp_draw.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=2),
+                    mp_draw.DrawingSpec(color=(255,0,0), thickness=2)
+                )
 
-    # Overlay debug
-    cv2.rectangle(frame, (8, 8), (220, 64), (0, 0, 0), thickness=-1)
-    cv2.putText(frame, f"Letra: {letra_estable}", (16, 56),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255,255,255), 2, cv2.LINE_AA)
+        if letra != "?":
+            last_preds.append(letra)
+        letra_estable = Counter(last_preds).most_common(1)[0][0] if last_preds else "?"
 
-    _, buf = cv2.imencode(".jpg", frame)
-    img64 = base64.b64encode(buf).decode("utf-8")
+        payload = {
+            "letra": letra_estable,
+            "debug": {"hands": n_hands, "ms": round((time.time()-t0)*1000)}
+        }
 
-    elapsed = round((time.time() - t0) * 1000)
-    # devolvemos info de debug para verlo en consola del navegador
-    return jsonify({
-        "frame": f"data:image/jpeg;base64,{img64}",
-        "letra": letra_estable,
-        "debug": {"hands": n_hands, "ms": elapsed}
-    })
+        if RETURN_FRAME:
+            cv2.rectangle(frame, (8, 8), (220, 64), (0, 0, 0), thickness=-1)
+            cv2.putText(frame, f"Letra: {letra_estable}", (16, 56),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255,255,255), 2, cv2.LINE_AA)
+            ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+            if ok:
+                payload["frame"] = "data:image/jpeg;base64," + base64.b64encode(buf).decode("utf-8")
 
+        return jsonify(payload)
+
+    except Exception as e:
+        # Evita 500 -> Render 502; devuelve 200 con error controlado
+        return jsonify({"error": "server-fail", "detail": str(e)}), 200
+
+# ============================
+# Main (Render usa PORT)
+# ============================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
